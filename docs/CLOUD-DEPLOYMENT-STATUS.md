@@ -1,6 +1,18 @@
 # Cloud deployment status
 
-Updated: 2026-09-24 (Asia/Shanghai).
+Updated: 2026-09-28 (Asia/Shanghai).
+
+## 2026-09-28 发布与服务器实查
+
+- Portfolio version 20 已由发布平台确认 succeeded；源提交 `8d02ac4`，GitHub main 和用户原始本地 checkout 已对齐。保留原访问权限。
+- JChatMind guided demo 提交 `a83455c` 已在 GitHub main 核对一致。实时 Demo 尚未部署，线上 `JCHATMIND_DEMO_URL` 仍未配置。
+- 已通过用户当前 Chrome 的 VNC 进入现有 root 控制台，确认 Debian、内存约 1.9 GiB、Swap 1 GiB、根盘约 30 GiB（可用约 26 GiB）。默认网关 204.152.213.1。
+- `ss -lntp` 显示 sshd 监听 IPv4/IPv6 22；UFW active 且允许 22。已有 Nginx/BT-Panel 占用 80、888、8888，后续必须保留其反向代理，不直接让 Caddy 抢占端口。
+- 本机直连有一次到达 SSH 主机密钥检查；ssh-keyscan 成功读到 Debian OpenSSH 9.2p1 与 ED25519 公钥。但随后连接再次长时间无响应；经现有 SOCKS 代理的单次测试在认证前关闭。尚未成功 SSH 登录，未发送密码，不能确定根因。
+- VNC 普通逐键命令可执行，修饰键/下划线输入不可靠，因此未通过该渠道执行配置修改。未改 VPN、防火墙、SSH 配置，未重启或重装服务器。
+- 下一步：恢复稳定且经过认证的 SSH 会话，再按 CLOUD-SETUP.md 部署并实测容量、模型、RAG、HTTPS；不能把 Portfolio 发布当作实时 Demo 上线。
+
+
 
 ## 最新接管检查（以本节为准）
 
