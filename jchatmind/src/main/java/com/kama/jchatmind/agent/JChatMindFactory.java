@@ -2,6 +2,7 @@ package com.kama.jchatmind.agent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.kama.jchatmind.agent.tools.Tool;
+import com.kama.jchatmind.agent.tools.KnowledgeTools;
 import com.kama.jchatmind.config.ChatClientRegistry;
 import com.kama.jchatmind.converter.AgentConverter;
 import com.kama.jchatmind.converter.ChatMessageConverter;
@@ -44,9 +45,6 @@ public class JChatMindFactory {
     private final ChatMessageFacadeService chatMessageFacadeService;
     private final ChatMessageConverter chatMessageConverter;
 
-    // 运行时 Agent 配置
-    private AgentDTO agentConfig;
-
     public JChatMindFactory(
             ChatClientRegistry chatClientRegistry,
             SseService sseService,
@@ -76,7 +74,7 @@ public class JChatMindFactory {
     /**
      * 将数据库中存储的记忆恢复成 List<Message> 结构
      */
-    private List<Message> loadMemory(String chatSessionId) {
+    private List<Message> loadMemory(String chatSessionId, AgentDTO agentConfig) {
         int messageLength = agentConfig.getChatOptions().getMessageLength();
         List<ChatMessageDTO> chatMessages = chatMessageFacadeService.getChatMessagesBySessionIdRecently(chatSessionId, messageLength);
         List<Message> memory = new ArrayList<>();
@@ -117,8 +115,7 @@ public class JChatMindFactory {
 
     private AgentDTO toAgentConfig(Agent agent) {
         try {
-            agentConfig = agentConverter.toDTO(agent);
-            return agentConfig;
+            return agentConverter.toDTO(agent);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("解析 Agent 配置失败", e);
         }
@@ -148,7 +145,11 @@ public class JChatMindFactory {
 
     private List<Tool> resolveRuntimeTools(AgentDTO agentConfig) {
         // 固定工具（系统强制）
-        List<Tool> runtimeTools = new ArrayList<>(toolFacadeService.getFixedTools());
+        Set<String> kbIds = new HashSet<>(Optional.ofNullable(agentConfig.getAllowedKbs()).orElse(List.of()));
+        List<Tool> runtimeTools = new ArrayList<>();
+        for (Tool tool : toolFacadeService.getFixedTools()) {
+            runtimeTools.add(tool instanceof KnowledgeTools knowledge ? knowledge.scopedTo(kbIds) : tool);
+        }
 
         // 可选工具（按 Agent 配置）
         List<String> allowedToolNames = agentConfig.getAllowedTools();
@@ -195,10 +196,12 @@ public class JChatMindFactory {
 
     private JChatMind buildAgentRuntime(
             Agent agent,
+            AgentDTO agentConfig,
             List<Message> memory,
             List<KnowledgeBaseDTO> knowledgeBases,
             List<ToolCallback> toolCallbacks,
-            String chatSessionId
+            String chatSessionId,
+            SseService events
     ) {
         ChatClient chatClient = chatClientRegistry.get(agent.getModel());
         if (Objects.isNull(chatClient)) {
@@ -215,7 +218,7 @@ public class JChatMindFactory {
                 toolCallbacks,
                 knowledgeBases,
                 chatSessionId,
-                sseService,
+                events,
                 chatMessageFacadeService,
                 chatMessageConverter
         );
@@ -227,7 +230,7 @@ public class JChatMindFactory {
     public JChatMind create(String agentId, String chatSessionId) {
         Agent agent = loadAgent(agentId);
         AgentDTO agentConfig = toAgentConfig(agent);
-        List<Message> memory = loadMemory(chatSessionId);
+        List<Message> memory = loadMemory(chatSessionId, agentConfig);
 
         // 解析 agent 的支持的知识库
         List<KnowledgeBaseDTO> knowledgeBases = resolveRuntimeKnowledgeBases(agentConfig);
@@ -238,10 +241,36 @@ public class JChatMindFactory {
 
         return buildAgentRuntime(
                 agent,
+                agentConfig,
                 memory,
                 knowledgeBases,
                 toolCallbacks,
-                chatSessionId
+                chatSessionId,
+                sseService
         );
+    }
+
+    /** A narrow runtime for the public demo; no optional or example tools. */
+    public JChatMind createGuest(String agentId, String chatSessionId, String kbId, SseService events) {
+        Agent agent = loadAgent(agentId);
+        if (agent == null) throw new IllegalStateException("Demo agent unavailable");
+        AgentDTO config = toAgentConfig(agent);
+        if (config.getAllowedKbs() == null || !config.getAllowedKbs().contains(kbId)) {
+            throw new IllegalStateException("Demo knowledge base unavailable");
+        }
+        config.setAllowedKbs(List.of(kbId));
+        config.setAllowedTools(List.of());
+        List<Tool> tools = resolveRuntimeTools(config).stream()
+                .filter(tool -> Set.of("KnowledgeTool", "dateTool", "terminate").contains(tool.getName()))
+                .toList();
+        List<ToolCallback> callbacks = buildToolCallbacks(tools);
+        callbacks.addAll(Arrays.asList(MethodToolCallbackProvider.builder()
+                .toolObjects(new com.kama.jchatmind.demo.DemoPricingTool()).build().getToolCallbacks()));
+        // Guest-specific instruction only; this loaded entity is not written back to the database.
+        agent.setSystemPrompt(agent.getSystemPrompt() + "\nGuest experience rules: For every monthly total, first retrieve the per-user price, then call calculateMonthlyCost with the requested user count. Copy its exact equation and total; never calculate money mentally. Keep replies concise. Distinguish CSV imports from CSV exports. Do not infer plan tiers or features not stated in the retrieved text. A missing maximum is unspecified, not a promise of unlimited seats.");
+        JChatMind runtime = buildAgentRuntime(agent, config, loadMemory(chatSessionId, config),
+                resolveRuntimeKnowledgeBases(config), callbacks, chatSessionId, events);
+        runtime.limitSteps(6);
+        return runtime;
     }
 }

@@ -1,4 +1,5 @@
 import { message } from "antd";
+import { API_ORIGIN } from "./origin";
 
 // API 响应类型定义，匹配后端 ApiResponse 结构
 export interface ApiResponse<T = unknown> {
@@ -13,7 +14,7 @@ export interface RequestOptions extends RequestInit {
 }
 
 // API 基础路径（可以根据环境变量配置）
-export const BASE_URL = "http://localhost:8080/api";
+export const BASE_URL = `${API_ORIGIN}/api`;
 
 /**
  * 构建完整的 URL（包含查询参数）

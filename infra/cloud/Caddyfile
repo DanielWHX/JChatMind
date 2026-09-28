@@ -1,0 +1,10 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DEMO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:80 {
+		flush_interval -1
+	}
+}

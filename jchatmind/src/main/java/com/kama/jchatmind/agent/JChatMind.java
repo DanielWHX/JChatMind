@@ -65,6 +65,12 @@ public class JChatMind {
 
     // 最多循环次数
     private static final Integer MAX_STEPS = 20;
+    private int maxSteps = MAX_STEPS;
+
+    public void limitSteps(int limit) {
+        if (limit < 1 || limit > MAX_STEPS) throw new IllegalArgumentException("Invalid step limit");
+        this.maxSteps = limit;
+    }
 
     private static final Integer DEFAULT_MAX_MESSAGES = 20;
 
@@ -319,11 +325,12 @@ public class JChatMind {
         }
 
         try {
-            for (int i = 0; i < MAX_STEPS && agentState != AgentState.FINISHED; i++) {
+            for (int i = 0; i < maxSteps && agentState != AgentState.FINISHED; i++) {
+                if (Thread.currentThread().isInterrupted()) throw new IllegalStateException("Agent interrupted");
                 // 当前步骤，用于实现 Agent Loop
                 int currentStep = i + 1;
                 step();
-                if (currentStep >= MAX_STEPS) {
+                if (currentStep >= maxSteps) {
                     agentState = AgentState.FINISHED;
                     log.warn("Max steps reached, stopping agent");
                 }

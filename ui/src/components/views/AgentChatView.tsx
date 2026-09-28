@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { API_ORIGIN } from "../../api/origin";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { message as antdMessage } from "antd";
 import AgentChatHistory from "./agentChatView/AgentChatHistory.tsx";
@@ -123,7 +124,7 @@ const AgentChatView: React.FC = () => {
       return;
     }
     const es = new EventSource(
-      `http://localhost:8080/sse/connect/${chatSessionId}`,
+      `${API_ORIGIN}/sse/connect/${chatSessionId}`,
     );
     es.onmessage = (event) => {
       console.log("Received message:", event.data);

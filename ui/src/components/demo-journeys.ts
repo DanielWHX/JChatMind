@@ -1,0 +1,15 @@
+export type JourneyStep = { title: string; goal: string; question: string; evidence: string };
+export const journeys: { id: string; title: string; description: string; steps: JourneyStep[] }[] = [
+  { id: "plans", title: "Choose a plan", description: "Find a fit. Change the team size.", steps: [
+    { title: "Find the right plan", goal: "You run an eight-person team. Ask the assistant to check the handbook before recommending a plan.", question: "We are an 8-person team and need CSV exports and Slack alerts. Search the handbook, recommend a plan, and calculate our monthly cost.", evidence: "Expand Search handbook below. Compare the recommendation with the retrieved plan features and per-user price." },
+    { title: "Follow up naturally", goal: "Keep the same conversation. Change only the team size to see whether the assistant remembers your requirements.", question: "The same team grows to 12 people next month. What would the new monthly cost be? Show the calculation.", evidence: "Check whether the reply keeps the Team plan and calculates 12 × $18 = $216 per month, before taxes." },
+  ] },
+  { id: "trial", title: "Start a trial", description: "Use today's date and plan onboarding.", steps: [
+    { title: "Calculate a real expiry date", goal: "Ask for a trial starting today. The assistant should retrieve the policy and call the date tool.", question: "If we start a free trial today, on what date does it expire? Use the date tool and the handbook. Show dates as YYYY-MM-DD.", evidence: "Expand the date result and handbook excerpt. The expiry should be the returned date plus 14 calendar days." },
+    { title: "Plan the first day", goal: "Turn the trial into practical next steps. This is guidance, not an account action.", question: "How should we onboard our team during this trial? We have a CSV with 6,000 rows and want Slack alerts. Check the handbook and explain any limits.", evidence: "Look for the 5,000-row limit per file and splitting the import. Slack setup is described, not performed." },
+  ] },
+  { id: "support", title: "Handle an enquiry", description: "Check uncertainty. Draft a reply.", steps: [
+    { title: "Check what is documented", goal: "A customer asks about SSO. See how the assistant handles a feature the handbook does not confirm.", question: "Does OrbitDesk support SAML SSO? Search the handbook before answering. If it is not documented, explain what needs confirmation.", evidence: "Read the retrieved excerpt. An undocumented feature should be referred to the product team, not promised or declared unsupported." },
+    { title: "Prepare a customer reply", goal: "Combine the policy boundary with a useful pricing answer. Nothing will be sent.", question: "Draft a short reply for our 12-person team needing CSV exports and Slack alerts. Include the appropriate plan, monthly price, and what still needs confirmation about SAML SSO. Check the handbook. Do not send it.", evidence: "Check the $216 monthly total, the SSO caveat, and that the response is clearly an unsent draft." },
+  ] },
+];

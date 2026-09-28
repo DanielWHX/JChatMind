@@ -1,0 +1,133 @@
+name: jchatmind-cloud
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jchatmind
+      POSTGRES_DB: jchatmind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/cloud-init.sh first}
+    volumes:
+      - cloud-postgres:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jchatmind -d jchatmind"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging: *logging
+
+  ollama:
+    image: ollama/ollama:0.11.10
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_MAX_LOADED_MODELS: 1
+      OLLAMA_KEEP_ALIVE: 5m
+    volumes:
+      - cloud-ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/cloud/api.Dockerfile
+    image: jchatmind-cloud-api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/cloud-init.sh first}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?Set the model key in .local/cloud/secrets.env}
+      ZHIPUAI_API_KEY: ${ZHIPUAI_API_KEY:-unused-cloud-demo}
+      ZHIPUAI_BASE_URL: ${ZHIPUAI_BASE_URL:-https://open.bigmodel.cn/api/paas}
+      ZHIPUAI_MODEL: ${ZHIPUAI_MODEL:-glm-4.6}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-disabled}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-disabled}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS_ENABLE: ${SMTP_STARTTLS_ENABLE:-true}
+      SMTP_STARTTLS_REQUIRED: ${SMTP_STARTTLS_REQUIRED:-true}
+      SMTP_SSL_ENABLE: ${SMTP_SSL_ENABLE:-false}
+      JCHATMIND_ADMIN_SECRET: ${JCHATMIND_ADMIN_SECRET:?Run scripts/cloud-init.sh first}
+      JCHATMIND_DEMO_SIGNING_SECRET: ${JCHATMIND_DEMO_SIGNING_SECRET:?Run scripts/cloud-init.sh first}
+      JCHATMIND_DEMO_AGENT_ID: ${JCHATMIND_DEMO_AGENT_ID:-}
+      JCHATMIND_DEMO_KB_ID: ${JCHATMIND_DEMO_KB_ID:-}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
+    volumes:
+      - cloud-documents:/app/data/documents
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/cloud/web.Dockerfile
+    image: jchatmind-cloud-web:local
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PORTFOLIO_ORIGIN: ${PORTFOLIO_ORIGIN:-https://hongxiang-wang-portfolio.danielwhx1017.chatgpt.site}
+      JCHATMIND_ADMIN_SECRET: ${JCHATMIND_ADMIN_SECRET:?Run scripts/cloud-init.sh first}
+      NGINX_ENVSUBST_FILTER: '^(PORTFOLIO_ORIGIN|JCHATMIND_ADMIN_SECRET)$$'
+    volumes:
+      - ./.local/cloud/admin.htpasswd:/etc/nginx/private/admin.htpasswd:ro
+    ports:
+      - "127.0.0.1:${CLOUD_HTTP_PORT:-8082}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:-demo.invalid}
+      ACME_EMAIL: ${ACME_EMAIL:-owner@example.invalid}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/cloud/Caddyfile:/etc/caddy/Caddyfile:ro
+      - cloud-caddy-data:/data
+      - cloud-caddy-config:/config
+    logging: *logging
+
+volumes:
+  cloud-postgres:
+  cloud-ollama:
+  cloud-documents:
+  cloud-caddy-data:
+  cloud-caddy-config:

@@ -5,6 +5,7 @@ import com.kama.jchatmind.model.entity.ChunkBgeM3;
 import com.kama.jchatmind.service.RagService;
 import lombok.Data;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.Assert;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -18,8 +19,9 @@ public class RagServiceImpl implements RagService {
     private final WebClient webClient;
     private final ChunkBgeM3Mapper chunkBgeM3Mapper;
 
-    public RagServiceImpl(WebClient.Builder builder, ChunkBgeM3Mapper chunkBgeM3Mapper) {
-        this.webClient = builder.baseUrl("http://localhost:11434").build();
+    public RagServiceImpl(WebClient.Builder builder, ChunkBgeM3Mapper chunkBgeM3Mapper,
+                          @Value("${ollama.base-url:http://localhost:11434}") String ollamaBaseUrl) {
+        this.webClient = builder.baseUrl(ollamaBaseUrl).build();
         this.chunkBgeM3Mapper = chunkBgeM3Mapper;
     }
 

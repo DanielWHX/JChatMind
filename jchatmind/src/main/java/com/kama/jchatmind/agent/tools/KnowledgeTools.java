@@ -2,16 +2,30 @@ package com.kama.jchatmind.agent.tools;
 
 import com.kama.jchatmind.service.RagService;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class KnowledgeTools implements Tool {
 
     private final RagService ragService;
+    private final Set<String> allowedKbIds;
 
+    @Autowired
     public KnowledgeTools(RagService ragService) {
         this.ragService = ragService;
+        this.allowedKbIds = Set.of();
+    }
+
+    private KnowledgeTools(RagService ragService, Set<String> allowedKbIds) {
+        this.ragService = ragService;
+        this.allowedKbIds = Set.copyOf(allowedKbIds);
+    }
+
+    public KnowledgeTools scopedTo(Set<String> allowedKbIds) {
+        return new KnowledgeTools(ragService, allowedKbIds);
     }
 
     @Override
@@ -34,6 +48,12 @@ public class KnowledgeTools implements Tool {
             description = "从指定知识库中执行相似性检索（RAG）。参数为知识库 ID（kbsId）和查询文本（query），返回与查询最相关的知识片段。"
     )
     public String knowledgeQuery(String kbsId, String query) {
+        if (!allowedKbIds.contains(kbsId)) {
+            return "This knowledge base is not available to this assistant.";
+        }
+        if (query == null || query.isBlank() || query.length() > 2000) {
+            return "Please use a shorter knowledge search query.";
+        }
         List<String> strings = ragService.similaritySearch(kbsId, query);
         return String.join("\n", strings);
     }
