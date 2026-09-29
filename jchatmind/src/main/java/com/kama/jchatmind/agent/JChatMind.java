@@ -24,7 +24,9 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -223,6 +225,41 @@ public class JChatMind {
     }
 
     // thinkPrompt 应该放到 system 中还是
+    // Database limits and MessageWindowChatMemory may cut through a tool
+    // exchange. Send only complete call/result groups to the model; the
+    // persisted conversation remains unchanged for the original UI.
+    private List<Message> modelHistory() {
+        List<Message> history = this.chatMemory.get(this.chatSessionId);
+        List<Message> complete = new ArrayList<>();
+        for (int i = 0; i < history.size(); i++) {
+            Message message = history.get(i);
+            if (message instanceof ToolResponseMessage) continue;
+            if (!(message instanceof AssistantMessage assistant) || assistant.getToolCalls().isEmpty()) {
+                complete.add(message);
+                continue;
+            }
+            Set<String> pending = new HashSet<>();
+            assistant.getToolCalls().forEach(call -> pending.add(call.id()));
+            List<Message> exchange = new ArrayList<>(List.of(message));
+            boolean valid = true;
+            int next = i + 1;
+            while (next < history.size() && history.get(next) instanceof ToolResponseMessage tool) {
+                for (var response : tool.getResponses()) {
+                    if (!pending.remove(response.id())) valid = false;
+                }
+                exchange.add(tool);
+                next++;
+            }
+            if (valid && pending.isEmpty()) {
+                complete.addAll(exchange);
+            } else if (StringUtils.hasText(assistant.getText())) {
+                complete.add(new AssistantMessage(assistant.getText()));
+            }
+            i = next - 1;
+        }
+        return complete;
+    }
+
     private boolean think() {
         String thinkPrompt = """
                 现在你是一个智能的的具体「决策模块」
@@ -238,7 +275,7 @@ public class JChatMind {
         // 又能够避免将 thinkPrompt 加入到聊天记录中
         Prompt prompt = Prompt.builder()
                 .chatOptions(this.chatOptions)
-                .messages(this.chatMemory.get(this.chatSessionId))
+                .messages(modelHistory())
                 .build();
 
         this.lastChatResponse = this.chatClient
@@ -277,7 +314,7 @@ public class JChatMind {
         }
 
         Prompt prompt = Prompt.builder()
-                .messages(this.chatMemory.get(this.chatSessionId))
+                .messages(modelHistory())
                 .chatOptions(this.chatOptions)
                 .build();
 

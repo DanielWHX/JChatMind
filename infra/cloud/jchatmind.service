@@ -1,0 +1,15 @@
+[Unit]
+Description=JChatMind Compose application
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/jchatmind
+ExecStart=/bin/bash /opt/jchatmind/scripts/cloud-compose.sh up -d --wait --wait-timeout 300
+TimeoutStartSec=360
+
+[Install]
+WantedBy=multi-user.target

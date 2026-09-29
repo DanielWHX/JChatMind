@@ -1,0 +1,28 @@
+# Host Nginx in front of the Compose loopback port. Replace DEMO_HOST with
+# the VPS IP/hostname. Keep administration behind an SSH tunnel until HTTPS.
+server {
+    listen 80;
+    server_name DEMO_HOST;
+    server_tokens off;
+    client_max_body_size 3m;
+
+    location = / { return 302 /demo; }
+
+    location = /demo { proxy_pass http://127.0.0.1:8082; }
+    location = /demo/ { return 308 /demo; }
+    location /assets/ { proxy_pass http://127.0.0.1:8082; }
+    location = /health { proxy_pass http://127.0.0.1:8082; }
+
+    location ~ ^/api/demo/(sessions|session|messages)$ {
+        proxy_pass http://127.0.0.1:8082;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 180s;
+    }
+
+    # No Basic Auth credentials are requested or accepted over public HTTP.
+    location / { return 403; }
+}
