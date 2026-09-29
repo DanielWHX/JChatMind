@@ -1,6 +1,10 @@
 # Cloud deployment status
 
-Updated: 2026-09-28 (Asia/Shanghai).
+Updated: 2026-09-30 (Asia/Shanghai).
+
+## 当前状态（优先于下方历史记录）
+
+VPS Docker 全栈已上线：http://204.152.213.21/demo 。五轮真实 LLM/RAG 链路及公网 Chrome 提问通过。部署、数据备份、临时 SSH 2222 和 HTTPS 待办详见 [VPS-DEPLOYMENT.md](VPS-DEPLOYMENT.md)。下方为历史阻塞记录，不代表当前状态。
 
 ## 2026-09-28 发布与服务器实查
 
