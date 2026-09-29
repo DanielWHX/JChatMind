@@ -70,7 +70,7 @@
     </select>
 
     <select id="selectBySessionIdRecently" resultMap="BaseResultMap">
-        SELECT id,
+        SELECT * FROM (SELECT id,
                session_id,
                role,
                content,
@@ -79,8 +79,9 @@
                updated_at
         FROM chat_message
         WHERE session_id = CAST(#{sessionId} AS uuid)
-        ORDER BY created_at
-        LIMIT #{limit}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}) recent
+        ORDER BY created_at ASC, id ASC
     </select>
 
     <delete id="deleteById">
