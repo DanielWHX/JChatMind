@@ -1,6 +1,8 @@
 
 # AI Agent System – JChatMind
 
+[修改日志 / Changelog](CHANGELOG.md) · [部署与恢复说明](docs/VPS-DEPLOYMENT.md)
+
 JChatMind is an intelligent AI Agent system built on top of the Spring AI framework, designed to support autonomous decision-making, tool invocation, and knowledge retrieval.
 
 The system implements a Think-Execute loop, enabling it to understand complex tasks, plan execution steps, invoke external tools, and retrieve relevant information from a knowledge base using RAG (Retrieval-Augmented Generation) to complete multi-step workflows.
